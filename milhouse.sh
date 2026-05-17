@@ -122,7 +122,7 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
       - 2>&1 | tee /dev/stderr
   ) || true
 
-  if grep -q "<promise>COMPLETE</promise>" "$LAST_MESSAGE_FILE" 2>/dev/null || echo "$OUTPUT" | grep -q "<promise>COMPLETE</promise>"; then
+  if grep -q "<promise>COMPLETE</promise>" "$LAST_MESSAGE_FILE" 2>/dev/null; then
     echo ""
     echo "Milhouse completed all tasks!"
     echo "Completed at iteration $i of $MAX_ITERATIONS"
