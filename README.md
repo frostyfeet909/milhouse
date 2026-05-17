@@ -2,70 +2,41 @@
 
 ![Milhouse](milhouse.webp)
 
-Milhouse is an autonomous AI agent loop that runs AI coding tools repeatedly until all PRD items are complete. The current runner still supports Amp and Claude Code; this fork is being prepared for a Codex-focused rewrite. Each iteration is a fresh instance with clean context. Memory persists via git history, `progress.txt`, and `prd.json`.
+Milhouse is a Codex-only autonomous agent loop. It runs fresh `codex exec` sessions repeatedly until every story in `prd.json` is complete. Memory persists through git history, `progress.txt`, `prd.json`, and AGENTS.md files.
 
 ## Prerequisites
 
-- One of the currently supported AI coding tools installed and authenticated:
-  - [Amp CLI](https://ampcode.com) (default)
-  - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (`npm install -g @anthropic-ai/claude-code`)
-- `jq` installed (`brew install jq` on macOS)
-- A git repository for your project
+- [Codex CLI](https://developers.openai.com/codex/) installed and authenticated
+- Bash
+- `jq`
+- A git repository for the target project
 
 ## Setup
 
-### Option 1: Copy to your project
+### Copy Milhouse Into a Project
 
-Copy the milhouse files into your project:
+From your project root:
 
 ```bash
-# From your project root
 mkdir -p scripts/milhouse
 cp /path/to/milhouse/milhouse.sh scripts/milhouse/
-
-# Copy the prompt template for your AI tool of choice:
-cp /path/to/milhouse/prompt.md scripts/milhouse/prompt.md    # For Amp
-# OR
-cp /path/to/milhouse/CLAUDE.md scripts/milhouse/CLAUDE.md    # For Claude Code
-
+cp /path/to/milhouse/CODEX.md scripts/milhouse/
 chmod +x scripts/milhouse/milhouse.sh
 ```
 
-### Option 2: Install skills globally
+Milhouse keeps its state beside the script, so `prd.json`, `progress.txt`, `.last-branch`, and `archive/` should live in `scripts/milhouse/` when you use this layout.
 
-Copy the skills to your Codex or Amp config for use across all projects:
+### Install Skills for Codex
 
-For Codex
 ```bash
 cp -r skills/prd ~/.codex/skills/
 cp -r skills/milhouse ~/.codex/skills/
 ```
 
-For AMP
-```bash
-cp -r skills/prd ~/.config/amp/skills/
-cp -r skills/milhouse ~/.config/amp/skills/
-```
-
 Available skills after installation:
+
 - `/prd` - Generate Product Requirements Documents
-- `/milhouse` - Convert PRDs to prd.json format
-
-Skills are automatically invoked when you ask Codex or Amp to:
-- "create a prd", "write prd for", "plan this feature"
-- "convert this prd", "turn into milhouse format", "create prd.json"
-
-### Configure Amp auto-handoff (recommended)
-
-Add to `~/.config/amp/settings.json`:
-
-```json
-{
-  "amp.experimental.autoHandoff": { "context": 90 }
-}
-```
-
-This enables automatic handoff when context fills up, allowing Milhouse to handle large stories that exceed a single context window.
+- `/milhouse` - Convert PRDs to Milhouse `prd.json` format
 
 ## Workflow
 
@@ -73,54 +44,87 @@ This enables automatic handoff when context fills up, allowing Milhouse to handl
 
 Use the PRD skill to generate a detailed requirements document:
 
-```
+```text
 Load the prd skill and create a PRD for [your feature description]
 ```
 
-Answer the clarifying questions. The skill saves output to `tasks/prd-[feature-name].md`.
-
-### 2. Convert PRD to Milhouse format
+### 2. Convert the PRD
 
 Use the Milhouse skill to convert the markdown PRD to JSON:
 
+```text
+Load the milhouse skill and convert tasks/prd-[feature-name].md to scripts/milhouse/prd.json
 ```
-Load the milhouse skill and convert tasks/prd-[feature-name].md to prd.json
-```
-
-This creates `prd.json` with user stories structured for autonomous execution.
 
 ### 3. Run Milhouse
 
-```bash
-# Using Amp (default)
-./scripts/milhouse/milhouse.sh [max_iterations]
+From the target project root:
 
-# Using Claude Code
-./scripts/milhouse/milhouse.sh --tool claude [max_iterations]
+```bash
+./scripts/milhouse/milhouse.sh
 ```
 
-Default is 10 iterations. Use `--tool amp` or `--tool claude` to select your AI coding tool.
+Set a max iteration count:
+
+```bash
+./scripts/milhouse/milhouse.sh 20
+```
+
+Each iteration starts a fresh non-interactive Codex session with:
+
+```bash
+codex exec --cd "$WORKSPACE_DIR" --sandbox danger-full-access --ask-for-approval never -
+```
 
 Milhouse will:
-1. Create a feature branch (from PRD `branchName`)
-2. Pick the highest priority story where `passes: false`
-3. Implement that single story
-4. Run quality checks (typecheck, tests)
-5. Commit if checks pass
-6. Update `prd.json` to mark story as `passes: true`
-7. Append learnings to `progress.txt`
-8. Repeat until all stories pass or max iterations reached
+
+1. Read `prd.json` and `progress.txt`
+2. Create or switch to the PRD `branchName`
+3. Pick the highest priority story where `passes: false`
+4. Implement that single story
+5. Run relevant quality checks
+6. Commit if checks pass
+7. Update `prd.json` to mark the story as `passes: true`
+8. Append learnings to `progress.txt`
+9. Repeat until all stories pass or max iterations is reached
+
+## Run From Codex App
+
+Codex App can open the workspace:
+
+```bash
+codex app .
+```
+
+Once the workspace is open, run Milhouse from an app-accessible terminal:
+
+```bash
+./scripts/milhouse/milhouse.sh
+```
+
+You can also ask Codex in the app to run that command. The local Codex CLI currently exposes workspace opening through `codex app .`; it does not expose a repo-defined one-click script launcher, so the shell command remains the execution path.
+
+## Future UI Option
+
+A small standalone npm webpage would be a good wrapper later. Keep it separate from this rewrite.
+
+Suggested shape:
+
+- Vite frontend with Start, Stop, and max-iteration controls
+- Express backend that launches `./milhouse.sh` as a child process
+- Live log streaming from stdout and stderr
+- Current PRD story status from `prd.json`
+- Clear running, completed, failed, and stopped states
 
 ## Key Files
 
 | File | Purpose |
 |------|---------|
-| `milhouse.sh` | The bash loop that spawns fresh AI instances (supports `--tool amp` or `--tool claude`) |
-| `prompt.md` | Prompt template for Amp |
-| `CLAUDE.md` | Prompt template for Claude Code |
-| `prd.json` | User stories with `passes` status (the task list) |
-| `prd.json.example` | Example PRD format for reference |
-| `progress.txt` | Append-only learnings for future iterations |
+| `milhouse.sh` | Codex loop runner |
+| `CODEX.md` | Prompt given to each Codex iteration |
+| `prd.json` | User stories with `passes` status |
+| `prd.json.example` | Sample PRD format for reference |
+| `progress.txt` | Append-only progress and learnings |
 | `skills/prd/` | Skill for generating PRDs |
 | `skills/milhouse/` | Skill for converting PRDs to JSON |
 | `.codex-plugin/` | Plugin manifest for Codex plugin discovery |
@@ -140,81 +144,77 @@ npm install
 npm run dev
 ```
 
-## Critical Concepts
+## Core Concepts
 
-### Each Iteration = Fresh Context
+### Each Iteration Has Fresh Context
 
-Each iteration spawns a **new AI instance** with clean context. The only memory between iterations is:
-- Git history (commits from previous iterations)
-- `progress.txt` (learnings and context)
-- `prd.json` (which stories are done)
+Each iteration starts a new Codex session. The only memory between iterations is:
 
-### Small Tasks
+- Git history
+- `progress.txt`
+- `prd.json`
+- AGENTS.md files
 
-Each PRD item should be small enough to complete in one context window. If a task is too big, the LLM runs out of context before finishing and produces poor code.
+### Keep Stories Small
+
+Each PRD item should be small enough to complete in one context window.
 
 Right-sized stories:
+
 - Add a database column and migration
 - Add a UI component to an existing page
 - Update a server action with new logic
 - Add a filter dropdown to a list
 
-Too big (split these):
-- "Build the entire dashboard"
-- "Add authentication"
-- "Refactor the API"
+Too large:
 
-### AGENTS.md Updates Are Critical
+- Build the entire dashboard
+- Add all authentication flows
+- Refactor the entire API
 
-After each iteration, Milhouse updates the relevant `AGENTS.md` files with learnings. This is key because AI coding tools automatically read these files, so future iterations (and future human developers) benefit from discovered patterns, gotchas, and conventions.
+### AGENTS.md Updates Matter
 
-Examples of what to add to AGENTS.md:
-- Patterns discovered ("this codebase uses X for Y")
-- Gotchas ("do not forget to update Z when changing W")
-- Useful context ("the settings panel is in component X")
+After each iteration, Milhouse asks Codex to update relevant AGENTS.md files with reusable patterns, gotchas, and conventions. Future iterations automatically benefit from that local knowledge.
 
-### Feedback Loops
+### Feedback Loops Matter
 
-Milhouse only works if there are feedback loops:
-- Typecheck catches type errors
-- Tests verify behavior
-- CI must stay green (broken code compounds across iterations)
+Milhouse only works well when the target project has checks Codex can run:
 
-### Browser Verification for UI Stories
-
-Frontend stories must include "Verify in browser using dev-browser skill" in acceptance criteria. Milhouse will use the dev-browser skill to navigate to the page, interact with the UI, and confirm changes work.
+- Typecheck
+- Tests
+- Lint
+- Build
+- Browser verification for UI stories when browser tooling is available
 
 ### Stop Condition
 
-When all stories have `passes: true`, Milhouse outputs `<promise>COMPLETE</promise>` and the loop exits.
+When all stories have `passes: true`, Codex outputs:
+
+```xml
+<promise>COMPLETE</promise>
+```
+
+The loop detects that signal and exits successfully.
 
 ## Debugging
 
 Check current state:
 
 ```bash
-# See which stories are done
-cat prd.json | jq '.userStories[] | {id, title, passes}'
-
-# See learnings from previous iterations
-cat progress.txt
-
-# Check git history
+cat scripts/milhouse/prd.json | jq '.userStories[] | {id, title, passes}'
+cat scripts/milhouse/progress.txt
 git log --oneline -10
 ```
 
 ## Customizing the Prompt
 
-After copying `prompt.md` (for Amp) or `CLAUDE.md` (for Claude Code) to your project, customize it for your project:
-- Add project-specific quality check commands
-- Include codebase conventions
-- Add common gotchas for your stack
+After copying `CODEX.md` into your project, customize it with:
+
+- Project-specific quality check commands
+- Codebase conventions
+- Common gotchas for your stack
+- Required browser verification steps
 
 ## Archiving
 
-Milhouse automatically archives previous runs when you start a new feature (different `branchName`). Archives are saved to `archive/YYYY-MM-DD-feature-name/`.
-
-## References
-
-- [Amp documentation](https://ampcode.com/manual)
-- [Claude Code documentation](https://docs.anthropic.com/en/docs/claude-code)
+Milhouse automatically archives previous runs when you start a new feature with a different `branchName`. Archives are saved to `archive/YYYY-MM-DD-feature-name/` beside the runner.
