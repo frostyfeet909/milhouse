@@ -42,3 +42,4 @@ npm run dev
 - Memory persists via git history, `progress.txt`, `prd.json`, and AGENTS.md files
 - Stories should be small enough to complete in one context window
 - Always update AGENTS.md with discovered reusable patterns for future iterations
+- With the current Codex CLI, approval policy is a top-level option. Use `codex --ask-for-approval never exec ...`, not `codex exec --ask-for-approval never ...`

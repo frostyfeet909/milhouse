@@ -115,10 +115,9 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
       printf -- '- Target workspace directory: `%s`\n' "$WORKSPACE_DIR"
       printf -- '- PRD file: `%s`\n' "$PRD_FILE"
       printf -- '- Progress file: `%s`\n' "$PROGRESS_FILE"
-    } | codex exec \
+    } | codex --ask-for-approval never exec \
       --cd "$WORKSPACE_DIR" \
       --sandbox danger-full-access \
-      --ask-for-approval never \
       --output-last-message "$LAST_MESSAGE_FILE" \
       - 2>&1 | tee /dev/stderr
   ) || true

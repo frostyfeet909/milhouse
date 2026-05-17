@@ -73,7 +73,7 @@ Set a max iteration count:
 Each iteration starts a fresh non-interactive Codex session with:
 
 ```bash
-codex exec --cd "$WORKSPACE_DIR" --sandbox danger-full-access --ask-for-approval never -
+codex --ask-for-approval never exec --cd "$WORKSPACE_DIR" --sandbox danger-full-access -
 ```
 
 Milhouse will:
